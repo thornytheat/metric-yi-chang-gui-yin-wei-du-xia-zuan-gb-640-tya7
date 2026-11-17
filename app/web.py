@@ -33,6 +33,7 @@ NAV = (
     ("/drilldown", "下钻", "drilldown"),
     ("/batches", "批次", "batches"),
     ("/report", "报告", "report"),
+    ("/purge", "退网", "purge"),
 )
 
 
@@ -331,6 +332,20 @@ def page_report(request: Request):
     return _page(request, "report.html", "report", axis_kind="date",
                  axis=_axis_of(report.get("attribution", {})), report=report,
                  contract=contract.payload())
+
+
+@pages.get("/purge", response_class=HTMLResponse)
+def page_purge(request: Request):
+    app_state = state(request)
+    purges = app_state.store.list_purges()
+    running = app_state.store.purge_running()
+    detail = None
+    if purges:
+        latest = purges[0]
+        detail = app_state.store.get_purge(latest["purge_id"])
+    return _page(request, "purge.html", "purge", axis_kind="date",
+                 axis=axis_for_dates([], ""), purges=purges,
+                 running=running, detail=detail)
 
 
 def _axis_of(result: dict) -> dict:

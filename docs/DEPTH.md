@@ -1,6 +1,6 @@
 # 深度登记 anomalyattr（指标异常归因与维度下钻）
 
-- 规模：中型（7 个功能模块 / 7 个页面 / 107 条测试）
+- 规模：中型（8 个功能模块 / 8 个页面 / 126 条测试）
 - 核心规则一：**稳健 z 异常检测**——按「门店 × 渠道」建日序列，取当日之前最近 28 个**同层**历史点（工作日 / 休息日分开，区间左闭右开，不含当日），`z = 0.6745 × (x − 中位数) / MAD`；`|z| ≥ 3.5` 为候选，相邻业务日同向连续 2 天为确认；同层点不足 14 不判；MAD 为 0 时退到平均绝对偏差，仍为 0 则本点不判。
 - 核心规则二：**LMDI 量价分解**——`净收入 = 可售房晚 × 出租率 × 均价`，权重用对数平均，`Δrev = Δ可售 + Δ出租率 + Δ均价 + 残差`；残差显式量化到分；任一侧因子为 0 时整组记 `A_ZERO_BASE` 并计入残差。
 - 核心规则三：**复盘与敏感性**——对每条确认异常重算一次基线：同层窗口先剔节假日点（占三成以上即标 `R_HOLIDAY_THIN`），MAD 为 0 退到平均绝对偏差，两者都为 0 时不做除法、记 `R_NO_DISPERSION`；因子用 LMDI 在事件窗口与其前等长窗口之间分解；再用窗口 21/28/35 × 阈值 2.5/3.5/4.5 扫九个组合，任一组合不再成立就把结论标 `unstable` 并列出翻转组合。
@@ -17,6 +17,7 @@
 | M5 归因与批次 | 看三因子分解、维度份额、同源重跑 | GET /api/attribution、POST /api/attribution/rerun、GET /api/batches、GET /api/reconcile、页面 /attribution /drilldown /batches | `app/modules/m5_attrib/handler.py` `app/modules/m5_attrib/service.py` `app/modules/m5_attrib/lmdi.py` `app/modules/m5_attrib/dimension.py` `app/modules/m5_attrib/batches.py` | `tests/test_attrib.py` |
 | M6 报告与导出 | 看运行清单、导出证据文件 | GET /api/report、GET /api/export/{kind}、页面 /report | `app/modules/m6_export/handler.py` `app/modules/m6_export/service.py` `app/modules/m6_export/csv_out.py` `app/modules/m6_export/report_build.py` `app/modules/m6_export/manifest_out.py` | `tests/test_export.py` |
 | M7 异常复盘 | 打开一条确认异常，看基线、因子、动作与稳定性；扫九个窗口×阈值组合 | GET /api/review、GET /api/review/{event_id}、GET /api/review/sensitivity、GET /api/review/cards.csv、页面 /review | `app/modules/m7_review/handler.py` `app/modules/m7_review/service.py` `app/modules/m7_review/baseline.py` `app/modules/m7_review/sensitiv.py` `app/modules/m7_review/corr.py` `app/modules/m7_review/cards_csv.py` | `tests/test_m7_review.py` `tests/test_m7_sensitivity.py` |
+| M8 门店退网清除 | 发起不可逆清除、看四账前后差额与残留、导出无门店标识凭据、中断后续跑 | POST /api/purges、GET /api/purges、GET /api/purges/{purge_id}、GET /api/purges/{purge_id}/vouchers/{kind}.csv、页面 /purge | `app/modules/m8_purge/handler.py` `app/modules/m8_purge/service.py` `app/modules/m8_purge/csv_out.py` `app/store.py` | `tests/test_m8_purge.py` |
 
 端到端：`tests/test_e2e.py`（脏样例 → 隔离 → 三账 → 检测 → 归因 → 导出，含 4xx 与幂等重跑）；复盘链路 `tests/test_m7_review.py::test_cards_match_confirmed_events`（检测 → 复盘卡 → 导出）。
 
@@ -36,6 +37,10 @@
 | TRAP-24 | 三因子各自四舍五入后合计与总差不符；份额凑不到 1 | 报告里差额和因子差 0.01，份额合计 100.01% | 因子用 40 位精度算，残差显式量化到分；份额尾差由「其他」或最大组吸收 | `app/modules/m5_attrib/lmdi.py`、`app/modules/m5_attrib/dimension.py` | `tests/test_attrib.py::test_lmdi_residual_is_explicit_zero` `tests/test_attrib.py::test_dimension_shares_conserve_to_one` `tests/test_attrib.py::test_zero_total_delta_marks_share_none` |
 | TRAP-27 | 复盘基线剔掉节假日后全等，MAD 与平均绝对偏差都是 0 | `0.6745 × (x − median) / mad` 直接除零，接口 500，或写死一个「无异常」 | 离散度为 0 时不进入除法：`review_z` 返回 `(None, R_NO_DISPERSION)`，卡上标退化、置信降为低 | `app/modules/m7_review/baseline.py` | `tests/test_m7_review.py::test_mad_zero_returns_code_not_division` `tests/test_m7_review.py::test_flat_series_card_flagged_degenerate` |
 | TRAP-28 | 基准组合下确认的事件，把阈值从 3.5 提到 4.5 就消失 | 只报基准组合的结论，把不稳定的判断当稳定的用 | 九个组合各跑一次检测，逐事件记保留/翻转；任一组合不成立就把结论标 unstable 并列出翻转组合 | `app/modules/m7_review/sensitiv.py`、`app/modules/m7_review/service.py` | `tests/test_m7_sensitivity.py::test_flip_marks_unstable_and_lists_combo` `tests/test_m7_sensitivity.py::test_threshold_monotonic_confirmed_points` |
+| TRAP-31 | 门店退网后直接 `DELETE` 明细行 | 旧批次行账/点账/金额账立刻不平，财务无法复核历史收入 | 先按 run×渠道×业务日聚成不含门店标识的汇总凭据，再在同一事务删明细并按剩余数据复算四账；报告差额逐项等于凭据承接量 | `app/modules/m8_purge/service.py`、`app/store.py` | `tests/test_m8_purge.py::test_voucher_revenue_equals_removed_detail_revenue` `tests/test_m8_purge.py::test_report_differences_match_vouchers_and_balanced` |
+| TRAP-32 | 只做读取隐藏，隔离记录或重导时门店又出现 | 隔离 CSV、复盘卡、同源重导仍能定位退网门店，等于没清 | 物理删除 points/quarantine 明细并扫描检测与复盘残留；退网门店在采信阶段即被剔除，同源重跑复用、新批次也不恢复 | `app/modules/m5_attrib/service.py`、`app/modules/m8_purge/service.py` | `tests/test_m8_purge.py::test_detection_and_review_have_no_purged_hotel` `tests/test_m8_purge.py::test_same_file_reimport_does_not_restore_decommissioned_hotel` `tests/test_m8_purge.py::test_new_batch_filters_decommissioned_hotel_rows` |
+| TRAP-33 | 清除过程中断在删了一半的批次 | 读路径看到半清除明细，续跑时凭据被重算成 0、账目永久不平 | 凭据写入+明细删除+summary 复算放进单个 SQLite 事务整体回滚；每批次提交后落 progress，续跑读回清除前快照只补未完成批次 | `app/store.py`、`app/modules/m8_purge/service.py` | `tests/test_m8_purge.py::test_interrupted_purge_resumes_and_finishes` `tests/test_m8_purge.py::test_interrupted_after_commit_resumes_remaining_runs` |
+| TRAP-34 | 清除与导入并发，导入把退网门店又写回去 | 清除白做，库里重新出现门店标识 | 进程内写锁 + `purges` 表 running 标记双重门：导入先检查再拿锁，清除在跑直接 409 E_PURGE_RUNNING | `app/modules/m5_attrib/service.py`、`app/store.py` | `tests/test_m8_purge.py::test_import_blocked_while_purge_running` `tests/test_m8_purge.py::test_api_import_conflict_during_purge` |
 
 ## 对账规则
 
@@ -45,6 +50,7 @@
 - 分解账：净收入差 = 可售房晚差 + 出租率差 + 均价差 + 残差
 - 四账在 /api/reconcile、/api/report、/batches 页面与 `/api/export/manifest.json` 导出中逐条给出，差额非 0 显式为「不平」。
 - 复盘账：确认事件数 = 复盘卡数；每张卡在九个敏感性组合里记一次「保留」或「翻转」，保留 + 翻转 = 9 × 卡数。
+- 清除账（M8）：清除前后差额 = 凭据承接量——有效点差 = 凭据点数；隔离表差（隔离行 + 被覆盖行）= 凭据条目数；净收入差 = 凭据净收入；行账差 = 采信差 + 隔离表差。完成前采信、隔离、检测、复盘四类残留必须全部为 0。
 
 ## 反例与不变量
 
@@ -64,3 +70,6 @@
 - 敏感性轴固定九组合（窗口 21/28/35 × 阈值 2.5/3.5/4.5），不在页面上自由扩展；单组合明细另有接口，范围 14-42 天与 1-10。
 - 同批异常只按「同一天、同方向、不同门店」判定；跨天不同长度的事件不合并，也不做因果推断。
 - 复盘基线只剔除节假日点，未按门店单独配置节假日表；节假日表只到 2026 年。
+- 退网清除的并发控制是单进程内的写锁 + `purges` 表标记，部署形态本来就是内部 8 人共用一个 SQLite 卷、单 uvicorn 进程；多进程水平扩展时需要换外部锁。
+- 退网清除不可逆：只提供按 `hotel_code` 整店清除，不支持按日期或渠道部分清除，也没有“撤销清除”；恢复门店只能凭外部原始文件重新走导入，且退网名单仍会过滤它。
+- 凭据按 run×渠道×业务日聚合，同一渠道同一业务日若有多条退网门店点会合并计数，无法从凭据回溯到单日以下的单行快照。

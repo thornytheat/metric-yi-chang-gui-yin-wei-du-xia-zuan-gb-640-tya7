@@ -11,6 +11,7 @@
 - **归因分解**：LMDI 三因子分解，残差显式；维度份额前 5 组单列，其余合并并吸收尾差。
 - **批次与清单**：`run_id` 由输入 sha256 + 规则版本 + 参数摘要派生，同源重跑直接复用。
 - **异常复盘**：确认事件生成复盘卡（基线、因子、动作、置信），并对窗口与阈值扫九个组合；翻转的结论标 `unstable`。
+- **退网清除（M8）**：按门店不可逆清除可定位本店的明细，先落不含门店标识的汇总凭据再删行，旧批次四账按剩余数据复算；报告核对清除前后差额与采信/隔离/复盘残留，中断可续跑、清除优先于导入、同文件重导不恢复退网门店。
 
 ## 模块
 
@@ -23,6 +24,7 @@
 | M5 归因与批次 | `GET /api/attribution`、`POST /api/attribution/rerun`、`GET /api/batches` | LMDI 三因子、份额守恒、幂等重跑 |
 | M6 报告与导出 | `GET /api/report`、`GET /api/export/{kind}` | 四账、清单、证据行导出 |
 | M7 异常复盘 | `GET /api/review`、`GET /api/review/{event_id}`、`GET /api/review/sensitivity`、`GET /api/review/cards.csv` | 剔除节假日的基线、LMDI 因子、敏感性九组合、同批异常 |
+| M8 退网清除 | `POST /api/purges`、`GET /api/purges`、`GET /api/purges/{purge_id}`、凭据 CSV | 无门店标识凭据承接、四账差额、残留核对、中断续跑、清除优先 |
 
 ## 核心规则
 
@@ -61,14 +63,14 @@ docker compose down -v --remove-orphans
 
 ## 接口与页面
 
-页面 7 个：`/`、`/anomalies`、`/review`、`/attribution`、`/drilldown`、`/batches`、`/report`；接口清单与失败码见 `docs/API.md`，交互式文档在 `/docs`。
+页面 8 个：`/`、`/anomalies`、`/review`、`/attribution`、`/drilldown`、`/batches`、`/report`、`/purge`；接口清单与失败码见 `docs/API.md`，交互式文档在 `/docs`。
 
 ## 目录
 
 ```text
 app/
   main.py config.py errors.py reasons.py manifest.py store.py web.py
-  modules/m1_ingest/ m2_calendar/ m3_quality/ m4_detect/ m5_attrib/ m6_export/ m7_review/
+  modules/m1_ingest/ m2_calendar/ m3_quality/ m4_detect/ m5_attrib/ m6_export/ m7_review/ m8_purge/
   templates/  static/
 docs/DEPTH.md docs/DATA-DICTIONARY.md docs/API.md docs/SAMPLES.md
 tests/ conftest.py test_<模块>.py test_e2e.py fixtures/expected.py

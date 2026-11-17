@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}门店退网清除{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>不可逆退网清除<span class="meta">汇总凭据承接原账，不含门店标识</span></h2>
+  <div class="body">
+    <form id="purge-form" class="kv">
+      <label for="hotel-input">门店编码</label>
+      <div>
+        <input id="hotel-input" name="hotel_code" type="text" placeholder="例如 H04" required>
+        <button class="small" id="purge-btn" type="submit">发起清除 / 续跑</button>
+        <span class="msg" id="purge-msg"></span>
+      </div>
+    </form>
+    <p class="hint">清除先按「批次 × 渠道 × 业务日」聚合凭据再删明细，旧批次四账按剩余数据复算；
+      任务中断后重发同一门店即可续跑，期间读不到半清除明细，退网门店随同源文件重导也不会恢复。</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>清除任务<span class="meta">{{ purges|length }} 个</span></h2>
+  <div class="body tight scroll">
+    <table>
+      <thead><tr><th class="static">任务</th><th class="static">门店</th><th class="static">状态</th>
+        <th class="static">创建时间</th><th class="static">完成时间</th><th class="static">凭据</th></tr></thead>
+      <tbody>
+      {% for item in purges %}
+        <tr>
+          <td class="mono"><a class="plain" href="/api/purges/{{ item.purge_id }}">{{ item.purge_id }}</a></td>
+          <td class="mono">{{ item.hotel_code }}</td>
+          <td><span class="tag {{ 'pass' if item.state == 'done' else 'confirmed' }}">
+            {{ "已完成" if item.state == "done" else "进行中" }}</span></td>
+          <td class="mono">{{ item.created_at }}</td>
+          <td class="mono">{{ item.completed_at or "—" }}</td>
+          <td class="hint">
+            <a class="plain" href="/api/purges/{{ item.purge_id }}/vouchers/points.csv">指标凭据</a>
+            ·
+            <a class="plain" href="/api/purges/{{ item.purge_id }}/vouchers/quarantine.csv">隔离凭据</a>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="empty">还没有退网清除任务。</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if detail and detail.report and detail.report.runs %}
+<section class="panel">
+  <h2>最近任务核对<span class="meta">{{ detail.purge_id }} · {{ detail.hotel_code }}</span></h2>
+  <div class="body tight">
+    <table>
+      <thead><tr><th class="static">账目</th><th class="num static">清除前</th>
+        <th class="num static">清除后</th><th class="num static">差额</th>
+        <th class="num static">凭据</th><th class="static">结论</th></tr></thead>
+      <tbody>
+      {% set rpt = detail.report %}
+        <tr><td>有效点</td>
+          <td class="num">{{ rpt.totals_before.points_valid|int }}</td>
+          <td class="num">{{ rpt.totals_after.points_valid|int }}</td>
+          <td class="num">{{ rpt.differences.points_valid|int }}</td>
+          <td class="num">{{ rpt.voucher_totals.points|int }}</td>
+          <td><span class="tag {{ 'pass' if rpt.variances[0].ok else 'confirmed' }}">
+            {{ "平" if rpt.variances[0].ok else "不平" }}</span></td></tr>
+        <tr><td>隔离表条目</td>
+          <td class="num">{{ (rpt.totals_before.rows_quarantine + rpt.totals_before.rows_superseded)|int }}</td>
+          <td class="num">{{ (rpt.totals_after.rows_quarantine + rpt.totals_after.rows_superseded)|int }}</td>
+          <td class="num">{{ (rpt.differences.rows_quarantine + rpt.differences.rows_superseded)|int }}</td>
+          <td class="num">{{ rpt.voucher_totals.quarantine_entries|int }}</td>
+          <td><span class="tag {{ 'pass' if rpt.variances[1].ok else 'confirmed' }}">
+            {{ "平" if rpt.variances[1].ok else "不平" }}</span></td></tr>
+        <tr><td>净收入合计</td>
+          <td class="num">{{ rpt.totals_before.revenue_accepted|money }}</td>
+          <td class="num">{{ rpt.totals_after.revenue_accepted|money }}</td>
+          <td class="num">{{ rpt.differences.revenue_accepted|money }}</td>
+          <td class="num">{{ rpt.voucher_totals.revenue_net|money }}</td>
+          <td><span class="tag {{ 'pass' if rpt.variances[2].ok else 'confirmed' }}">
+            {{ "平" if rpt.variances[2].ok else "不平" }}</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="grid-2">
+  <section class="panel">
+    <h2>残留核对<span class="meta">采信 / 隔离 / 检测 / 复盘</span></h2>
+    <div class="body tight">
+      <table>
+        <thead><tr><th class="static">项</th><th class="num static">残留数</th><th class="static">结论</th></tr></thead>
+        <tbody>
+        {% for item in rpt.residuals %}
+          <tr><td>{{ item.name }}</td><td class="num">{{ item.count }}</td>
+            <td><span class="tag {{ 'pass' if item.ok else 'confirmed' }}">
+              {{ "无残留" if item.ok else "有残留" }}</span></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>批次差额<span class="meta">{{ rpt.runs|length }} 个批次</span></h2>
+    <div class="body tight scroll">
+      <table>
+        <thead><tr><th class="static">批次</th><th class="num static">删点</th>
+          <th class="num static">删隔离</th><th class="num static">凭据行</th></tr></thead>
+        <tbody>
+        {% for item in rpt.runs %}
+          <tr><td class="mono">{{ item.run_id }}</td>
+            <td class="num">{{ item.removed_points }}</td>
+            <td class="num">{{ item.removed_quarantine }}</td>
+            <td class="num">{{ item.point_voucher_rows }} / {{ item.quarantine_voucher_rows }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endif %}
+
+<script>
+(function () {
+  var form = document.getElementById("purge-form");
+  if (!form) { return; }
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    var input = document.getElementById("hotel-input");
+    var msg = document.getElementById("purge-msg");
+    var hotel = (input.value || "").trim();
+    if (!hotel) { msg.textContent = "请输入门店编码"; msg.className = "msg err"; return; }
+    msg.textContent = "清除中…"; msg.className = "msg";
+    fetch("/api/purges", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hotel_code: hotel })
+    }).then(function (resp) {
+      return resp.json().then(function (body) { return { ok: resp.ok, body: body }; });
+    }).then(function (result) {
+      if (!result.ok) {
+        msg.textContent = (result.body.error || "失败") + " " + (result.body.message || "");
+        msg.className = "msg err";
+        return;
+      }
+      var body = result.body;
+      msg.textContent = body.reused ? "该门店已退网，返回原清除报告" : "清除完成，正在刷新…";
+      window.location.reload();
+    }).catch(function (err) {
+      msg.textContent = "请求失败：" + err; msg.className = "msg err";
+    });
+  });
+}());
+</script>
+{% endblock %}

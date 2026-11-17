@@ -49,6 +49,14 @@ def _summary(run_manifest: manifest.RunManifest, quality, ingest, detection: dic
 
 
 def run_batch(settings: config.Settings, store, data: bytes, input_name: str) -> dict:
+    # M8：清除优先于导入。即使命中同源批次也要先拒绝，保证清除期间没有任何写入口。
+    running_purge = store.purge_running()
+    if running_purge is not None:
+        from app.errors import Conflict
+        raise Conflict(
+            "门店退网清除进行中（%s），导入需等清除完成" % running_purge["hotel_code"],
+            code="E_PURGE_RUNNING", purge_id=running_purge["purge_id"],
+            hotel_code=running_purge["hotel_code"])
     digest = manifest.sha256_bytes(data)
     params_key = manifest.params_digest(settings.params_digest_payload())
     key = batches.run_key(digest, settings.rules_version, params_key)
@@ -60,9 +68,41 @@ def run_batch(settings: config.Settings, store, data: bytes, input_name: str) ->
         payload["run_key"] = key
         return payload
 
+    with store.write_lock:
+        # 拿锁后复查：清除任务可能恰好在上面检查之后抢先持锁。
+        running_purge = store.purge_running()
+        if running_purge is not None:
+            from app.errors import Conflict
+            raise Conflict(
+                "门店退网清除进行中（%s），导入需等清除完成" % running_purge["hotel_code"],
+                code="E_PURGE_RUNNING", purge_id=running_purge["purge_id"],
+                hotel_code=running_purge["hotel_code"])
+        return _build_batch(settings, store, data, input_name, digest, params_key, key)
+
+
+def _build_batch(settings: config.Settings, store, data: bytes, input_name: str,
+                 digest: str, params_key: str, key: str) -> dict:
     clock = manifest.RunClock()
     ingest = ingest_service.ingest(data, input_name, settings)
+    # M8：退网门店即使随同文件重导也不恢复，采信阶段就剔除其全部行。
+    decommissioned = store.decommissioned_hotels()
+    if decommissioned:
+        kept_rows = [row for row in ingest.rows
+                     if (row.get("hotel_code") or "").strip() not in decommissioned]
+        skipped = len(ingest.rows) - len(kept_rows)
+        ingest.rows = kept_rows
+        if skipped:
+            ingest.notices = list(ingest.notices) + [{
+                "code": "N_HOTEL_PURGED",
+                "label": reasons.label("N_HOTEL_PURGED"),
+                "detail": "退网门店 %d 行在采信阶段剔除，不恢复明细" % skipped,
+                "skipped_rows": skipped,
+                "hotels": sorted(decommissioned),
+            }]
     coerced, coerce_rejects = coerce_service.coerce_rows(ingest.rows, settings)
+    if decommissioned:
+        coerce_rejects = [item for item in coerce_rejects
+                          if item.get("hotel_code") not in decommissioned]
     quality = quality_service.evaluate(
         coerced, list(ingest.rejects) + coerce_rejects, settings,
         records_read=ingest.total_records)
@@ -93,6 +133,8 @@ def run_batch(settings: config.Settings, store, data: bytes, input_name: str) ->
     summary = _summary(run_manifest, quality, ingest, detection, settings)
     summary["run_key"] = key
     summary["reused"] = False
+    if decommissioned:
+        summary["purged_hotels"] = sorted(decommissioned)
     store.save_run(run_manifest.as_dict(), key, summary)
     store.replace_points(run_id, points)
     store.replace_quarantine(run_id, quality.quarantine)

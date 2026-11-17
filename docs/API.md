@@ -13,6 +13,7 @@
 | `/drilldown` | 渠道分解与门店明细 |
 | `/batches` | 批次刻度、运行清单、同源重跑 |
 | `/report` | 运行报告与导出口 |
+| `/purge` | 门店退网清除：发起/续跑、任务清单、差额与残留核对、凭据导出 |
 
 ## 接口
 
@@ -39,6 +40,22 @@
 | GET | `/api/review/{event_id}` | 单张复盘卡（含逐日证据与同向对照） |
 | GET | `/api/review/sensitivity` | 单组合明细：`window` 14-42、`threshold` 1-10 |
 | GET | `/api/review/cards.csv` | 复盘卡 CSV（BOM + 标记码） |
+| GET | `/api/purges` | 退网清除任务清单、进行中任务与已退网门店 |
+| POST | `/api/purges` | 发起或续跑门店不可逆清除（body：`{"hotel_code": "H04"}`） |
+| GET | `/api/purges/{purge_id}` | 清除报告：四账前后差额、凭据守恒、残留核对 |
+| GET | `/api/purges/{purge_id}/vouchers/points.csv` | 指标汇总凭据 CSV（无门店标识） |
+| GET | `/api/purges/{purge_id}/vouchers/quarantine.csv` | 隔离汇总凭据 CSV（无门店标识） |
+
+## 门店退网清除（M8）
+
+清除是不可逆操作，流程为「凭据承接 → 明细删除 → 四账复算」：
+
+- 先按 `run × channel × biz_date` 把退网门店的有效点与隔离行聚成**不含门店标识**的汇总凭据（`purge_point_vouchers` / `purge_quarantine_vouchers`），再在同一 SQLite 事务内删除明细并复算批次 summary；事务失败整体回滚，读路径看不到半清除明细。
+- 任务状态只有 `running` / `done`，中断后对同一门店重发 `POST /api/purges` 即续跑：已提交批次读回进度跳过，未完成批次继续处理。
+- 清除优先于导入：存在 `running` 任务时 `POST /api/import` 直接返回 409 `E_PURGE_RUNNING`。
+- 已退网门店 (`state=done`) 随同源文件重导不会恢复：命中同源批次直接复用；新批次在采信阶段剔除该门店全部行并记 `N_HOTEL_PURGED`。
+- 报告 `variances` 逐项核对「清除前后差额 = 凭据承接量」（有效点、隔离表条目含被覆盖行、净收入、行账），`residuals` 扫描采信、隔离、异常检测、复盘四处残留；任一不平返回 `E_PURGE_UNBALANCED` 且任务不置完成。
+- 门店标识只保留在 `purges` 任务头供审计；凭据表与凭据导出均无 `hotel_code` / `hotel_name` 列。
 
 ## 失败返回
 
@@ -56,5 +73,9 @@
 | 复盘窗口或阈值越界 | 400 | `E_BAD_AXIS` |
 | 复盘卡不存在 | 404 | `E_CARD_NOT_FOUND` |
 | 当前批次没有有效点 | 400 | `E_NO_POINTS` |
+| 退网清除进行中导入冲突 | 409 | `E_PURGE_RUNNING` |
+| 清除任务不存在 | 404 | `E_PURGE_NOT_FOUND` |
+| 门店编码为空 | 400 | `E_BAD_HOTEL` |
+| 清除后对账不平 | 400 | `E_PURGE_UNBALANCED` |
 
 错误体固定为 `{"error": "...", "message": "..."}`，空态额外带 `empty_state`。

@@ -43,6 +43,10 @@ REASONS: dict[str, Reason] = {r.code: r for r in (
     Reason("R_CORRELATED", "同批异常", "review", "同日同向且门店互不相同的确认点归为一组"),
     Reason("R_FLIP", "敏感性翻转", "review", "换窗口或阈值后结论不再成立"),
     Reason("R_ZERO_BASE", "因子无法分解", "review", "基期或当期因子为 0，差额全进残差"),
+    Reason("N_HOTEL_PURGED", "门店退网已清除", "notice",
+           "该门店已不可逆退网，明细被汇总凭据承接，重导不再恢复"),
+    Reason("V_PURGE_VOUCHER", "退网汇总凭据", "notice",
+           "不含门店标识的聚合凭据，承接退网门店的原四账与收入合计"),
 )}
 
 ACCOUNTS = ("quarantine", "duplicate", "missing", "late", "notice", "review")
