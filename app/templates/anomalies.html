@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}异常时间轴{% endblock %}
+{% block content %}
+{% if run %}
+<section class="grid-metrics">
+  <div class="metric"><div class="k">序列</div><div class="v">{{ detection.series|default(0) }}</div></div>
+  <div class="metric"><div class="k">确认点</div><div class="v">{{ detection.confirmed_points|default(0) }}</div></div>
+  <div class="metric"><div class="k">候选点</div><div class="v">{{ detection.candidate_points|default(0) }}</div></div>
+  <div class="metric"><div class="k">事件</div><div class="v">{{ detection.events|default(0) }}</div></div>
+  <div class="metric"><div class="k">不判</div><div class="v">{{ (detection.insufficient_points|default(0)) + (detection.undefined_points|default(0)) }}</div></div>
+  <div class="metric"><div class="k">阈值</div><div class="v">{{ detection.threshold|default("-") }}<small>|z|</small></div></div>
+</section>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>异常事件<span class="meta">{{ events|length }} 次</span></h2>
+    <div class="body tight scroll">
+      <table>
+        <thead><tr><th class="static">序列</th><th class="static">起</th><th class="static">止</th><th class="num static">天数</th>
+          <th class="static">方向</th><th class="num static">差额</th><th class="num static">峰值 z</th></tr></thead>
+        <tbody>
+        {% for item in events %}
+          <tr><td class="mono">{{ item.series }}</td><td class="mono">{{ item.start }}</td><td class="mono">{{ item.end }}</td>
+            <td class="num">{{ item.days }}</td>
+            <td><span class="tag {{ 'confirmed' if item.direction == 'low' else 'plan' }}">{{ item.direction|direction }}</span></td>
+            <td class="num">{{ item.delta|money }}</td><td class="num">{{ item.peak_z }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if not events %}<p class="empty">没有确认异常。</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>检测说明<span class="meta">{{ notes|length }} 条</span></h2>
+    <div class="body">
+      <dl class="kv">
+        <dt>窗口</dt><dd>{{ detection.window_points|default("-") }} 个同层点</dd>
+        <dt>最少基线</dt><dd>{{ detection.min_baseline|default("-") }} 点</dd>
+        <dt>连续确认</dt><dd>{{ "同向 2 天" }}</dd>
+        <dt>分层</dt><dd>工作日 / 休息日</dd>
+      </dl>
+      <ul class="hint">
+      {% for note in notes %}<li>{{ note.label }}：{{ note.detail }}</li>{% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>异常点明细<span class="meta">{{ detections|length }} 行</span></h2>
+  <div class="body tight scroll">
+    <table id="detect-table">
+      <thead><tr><th class="static">序列</th><th class="static">业务日</th><th class="static">层</th>
+        <th class="num static">净收入</th><th class="num static">中位数</th><th class="num static">离散度</th>
+        <th class="num static">z</th><th class="static">方式</th><th class="static">状态</th><th class="static">方向</th>
+        <th class="num static">基线点</th></tr></thead>
+      <tbody>
+      {% for item in detections %}
+        <tr>
+          <td class="mono">{{ item.series }}</td>
+          <td class="mono">{{ item.biz_date }}</td>
+          <td>{{ item.stratum|stratum }}</td>
+          <td class="num">{{ item.value|money }}</td>
+          <td class="num">{{ item.median|money }}</td>
+          <td class="num">{{ item.dispersion|ratio }}</td>
+          <td class="num">{{ item.z }}</td>
+          <td>{{ item.method }}</td>
+          <td><span class="tag {{ item.status }}">{{ item.status|status }}</span></td>
+          <td>{{ item.direction|direction }}</td>
+          <td class="num">{{ item.baseline_points }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if not detections %}<p class="empty">没有候选或确认点。</p>{% endif %}
+  </div>
+</section>
+{% else %}
+<section class="panel"><div class="body"><p class="empty">还没有批次，先导入样例。</p></div></section>
+{% endif %}
+{% endblock %}

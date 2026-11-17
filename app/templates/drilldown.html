@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}维度下钻{% endblock %}
+{% block content %}
+{% if by_hotel and not by_hotel.empty %}
+<section class="panel">
+  <h2>渠道分解<span class="meta">当期 {{ by_channel.cur[0] }} → {{ by_channel.cur[1] }}</span></h2>
+  <div class="body tight scroll">
+    <table>
+      <thead><tr><th class="static">渠道</th><th class="num static">基期</th><th class="num static">当期</th>
+        <th class="num static">差额</th><th class="num static">份额</th><th class="num static">可售差</th>
+        <th class="num static">出租率差</th><th class="num static">均价差</th><th class="static">状态</th></tr></thead>
+      <tbody>
+      {% for row in by_channel.rows %}
+        <tr>
+          <td class="mono">{{ row.label|channel }}</td>
+          <td class="num">{{ row.rev_base|money }}</td>
+          <td class="num">{{ row.rev_cur|money }}</td>
+          <td class="num">{{ row.delta|money }}</td>
+          <td class="num">{{ row.share|percent if row.share else "-" }}</td>
+          {% for factor in row.decomposition.factors %}
+          <td class="num">{{ factor.value|money }}</td>
+          {% endfor %}
+          <td><span class="tag {{ 'ok' if row.ok else 'warn' }}">{{ "平" if row.ok else "残差" }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>门店明细<span class="meta">{{ by_hotel.rows|length }} 组 · 其他 {{ by_hotel.other.count }} 组</span></h2>
+  <div class="body tight scroll">
+    <table>
+      <thead><tr><th class="static">门店</th><th class="num static">基期房晚</th><th class="num static">当期房晚</th>
+        <th class="num static">基期已售</th><th class="num static">当期已售</th>
+        <th class="num static">差额</th><th class="num static">份额</th><th class="static">分解</th></tr></thead>
+      <tbody>
+      {% for row in by_hotel.rows %}
+        <tr>
+          <td class="mono">{{ row.label }}</td>
+          <td class="num">{{ row.avail_base }}</td>
+          <td class="num">{{ row.avail_cur }}</td>
+          <td class="num">{{ row.sold_base }}</td>
+          <td class="num">{{ row.sold_cur }}</td>
+          <td class="num">{{ row.delta|money }}</td>
+          <td class="num">{{ row.share|percent if row.share else "-" }}</td>
+          <td><span class="tag {{ 'ok' if row.ok else 'warn' }}">{{ "平" if row.ok else "残差" }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>下钻结论<span class="meta">份额合计 {{ by_hotel.share_sum|percent }}</span></h2>
+  <div class="body">
+    <dl class="kv">
+      <dt>基期</dt><dd>{{ by_hotel.base[0] }} → {{ by_hotel.base[1] }}</dd>
+      <dt>当期</dt><dd>{{ by_hotel.cur[0] }} → {{ by_hotel.cur[1] }}</dd>
+      <dt>总差额</dt><dd>{{ by_hotel.total.delta|money }} 元</dd>
+      <dt>残差</dt><dd>{{ by_hotel.total.residual|money }} 元</dd>
+      <dt>两期都有</dt><dd>{{ by_hotel.coverage.series_both }} 条序列</dd>
+    </dl>
+  </div>
+</section>
+{% else %}
+<section class="panel"><div class="body"><p class="empty">还没有批次，先导入样例。</p></div></section>
+{% endif %}
+{% endblock %}

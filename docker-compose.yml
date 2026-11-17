@@ -1,0 +1,23 @@
+services:
+  app:
+    build: .
+    image: anomalyattr:local
+    environment:
+      ANOMALYATTR_DB: /data/anomalyattr.sqlite
+      ANOMALYATTR_SAMPLE_DIR: /app/sample_data
+      ANOMALYATTR_SEED: "1"
+      EVAL_DATE: "2026-11-22"
+      TZ: Asia/Shanghai
+    ports:
+      - "18209:8000"
+    volumes:
+      - anomalyattr-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://127.0.0.1:8000/healthz', timeout=2.0)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  anomalyattr-data:

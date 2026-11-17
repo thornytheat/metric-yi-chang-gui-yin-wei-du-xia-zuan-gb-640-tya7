@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}批次历史{% endblock %}
+{% block content %}
+{% if run %}
+<section class="panel">
+  <h2>批次刻度<span class="meta">{{ runs|length }} 次</span></h2>
+  <div class="body tight scroll">
+    <table>
+      <thead><tr><th class="static">批次</th><th class="static">生成时间</th><th class="static">输入</th>
+        <th class="static">sha256</th><th class="num static">有效点</th><th class="num static">隔离</th>
+        <th class="static">水位</th><th class="num static">耗时</th></tr></thead>
+      <tbody>
+      {% for item in runs %}
+        <tr>
+          <td class="mono"><a class="plain" href="/api/batches/{{ item.run_id }}">{{ item.run_id }}</a></td>
+          <td class="mono">{{ item.created_at }}</td>
+          <td class="truncate" title="{{ item.input_name }}">{{ item.input_name }}</td>
+          <td class="mono">{{ item.input_sha256 }}</td>
+          <td class="num">{{ item.points_valid }}</td>
+          <td class="num">{{ item.rows_quarantine }}</td>
+          <td class="mono">{{ item.watermark }}</td>
+          <td class="num">{{ item.duration_ms }}<small> ms</small></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>四账核对<span class="meta">{{ run.run_id }}</span></h2>
+    <div class="body tight">
+      <table>
+        <thead><tr><th class="static">账目</th><th class="static">规则</th><th class="num static">左</th><th class="num static">右</th><th class="static">结论</th></tr></thead>
+        <tbody>
+        {% for item in checks %}
+          <tr><td>{{ item.name }}</td><td class="hint">{{ item.formula }}</td>
+            <td class="num">{{ item.left|int }}</td><td class="num">{{ item.right|int }}</td>
+            <td><span class="tag {{ 'pass' if item.ok else 'confirmed' }}">{{ "平" if item.ok else "不平" }}</span></td></tr>
+        {% endfor %}
+          <tr><td>分解账</td><td class="hint">净收入差 = 三因子 + 残差</td>
+            <td class="num">-</td><td class="num">-</td>
+            <td><span class="tag {{ 'pass' if reconcile.identity_ok else 'confirmed' }}">{{ "平" if reconcile.identity_ok else "不平" }}</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>重跑与水位<span class="meta">{{ run.rules_version }}</span></h2>
+    <div class="body">
+      <dl class="kv">
+        <dt>输入 sha256</dt><dd class="truncate" title="{{ run.input_sha256 }}">{{ run.input_sha256[:24] }}</dd>
+        <dt>参数摘要</dt><dd>{{ summary.params_key }}</dd>
+        <dt>水位</dt><dd>{{ summary.watermark }}</dd>
+        <dt>迟到点</dt><dd>{{ accounts.late_points|default(0) }}</dd>
+        <dt>超窗迟到</dt><dd>{{ accounts.out_of_window_points|default(0) }}</dd>
+      </dl>
+      <p><button class="small" id="rerun-btn" type="button">重跑</button> <span class="msg" id="rerun-msg"></span></p>
+    </div>
+  </section>
+</div>
+{% else %}
+<section class="panel"><div class="body"><p class="empty">还没有批次，先导入样例。</p></div></section>
+{% endif %}
+{% endblock %}

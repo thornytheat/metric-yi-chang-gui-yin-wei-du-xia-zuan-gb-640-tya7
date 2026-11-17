@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}指标接入{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>指标接入<span class="meta">{{ samples|length }} 个样例</span></h2>
+  <div class="body">
+    <form class="import" id="import-form">
+      <label>样例文件
+        <select name="sample" id="sample-select">
+          {% for item in samples %}<option value="{{ item.name }}">{{ item.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>上传文件
+        <input type="file" name="file" id="file-input" accept=".csv,text/csv">
+      </label>
+      <div>
+        <button type="submit" class="primary" id="run-btn">导入</button>
+        <button type="button" class="ghost" id="preview-btn">仅采信</button>
+      </div>
+    </form>
+    <p class="msg" id="import-msg"></p>
+  </div>
+</section>
+
+{% if summary %}
+<section class="grid-metrics">
+  <div class="metric"><div class="k">读入行</div><div class="v">{{ accounts.rows_read|int }}</div></div>
+  <div class="metric"><div class="k">有效点</div><div class="v">{{ accounts.points_valid|int }}</div></div>
+  <div class="metric"><div class="k">缺失点</div><div class="v">{{ accounts.points_missing|int }}</div></div>
+  <div class="metric"><div class="k">被覆盖</div><div class="v">{{ accounts.rows_superseded|int }}</div></div>
+  <div class="metric"><div class="k">隔离行</div><div class="v">{{ accounts.rows_quarantine|int }}</div></div>
+  <div class="metric"><div class="k">迟到点</div><div class="v">{{ accounts.late_points|int }}</div></div>
+</section>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>四账核对<span class="meta">{{ "平" if checks and checks|selectattr("ok")|list|length == checks|length else "不平" }}</span></h2>
+    <div class="body tight">
+      <table>
+        <thead><tr><th class="static">账目</th><th class="static">规则</th><th class="num static">左</th><th class="num static">右</th><th class="static">结论</th></tr></thead>
+        <tbody>
+        {% for item in checks %}
+          <tr><td>{{ item.name }}</td><td class="hint">{{ item.formula }}</td>
+            <td class="num">{{ item.left|int }}</td><td class="num">{{ item.right|int }}</td>
+            <td><span class="tag {{ 'pass' if item.ok else 'confirmed' }}">{{ "平" if item.ok else "不平" }}</span></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>原因码<span class="meta">{{ summary.reason_counts|length }} 类</span></h2>
+    <div class="body tight scroll">
+      <table>
+        <thead><tr><th class="static">码</th><th class="static">含义</th><th class="static">账</th><th class="num static">条</th></tr></thead>
+        <tbody>
+        {% for row in summary.reason_counts %}
+          <tr><td class="mono">{{ row.code }}</td><td>{{ row.label }}</td>
+            <td><span class="tag">{{ row.account }}</span></td><td class="num">{{ row.count }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if not summary.reason_counts %}<p class="empty">没有隔离行。</p>{% endif %}
+    </div>
+  </section>
+</div>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>异常概览<span class="meta">{{ detection.events|default(0) }} 次事件</span></h2>
+    <div class="body">
+      <dl class="kv">
+        <dt>确认点</dt><dd>{{ detection.confirmed_points|default(0) }}</dd>
+        <dt>候选点</dt><dd>{{ detection.candidate_points|default(0) }}</dd>
+        <dt>基线不足</dt><dd>{{ detection.insufficient_points|default(0) }}</dd>
+        <dt>阈值</dt><dd>|z| ≥ {{ detection.threshold|default("-") }}</dd>
+        <dt>窗口</dt><dd>{{ detection.window_points|default("-") }} 个同层点</dd>
+      </dl>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>批次刻度<span class="meta">{{ runs|length }} 次</span></h2>
+    <div class="body tight">
+      <table>
+        <thead><tr><th class="static">批次</th><th class="static">水位</th><th class="num static">有效点</th><th class="num static">隔离</th></tr></thead>
+        <tbody>
+        {% for item in runs %}
+          <tr><td class="mono truncate"><a class="plain" href="/api/batches/{{ item.run_id }}">{{ item.run_id }}</a></td>
+            <td class="mono">{{ item.watermark }}</td>
+            <td class="num">{{ item.points_valid }}</td><td class="num">{{ item.rows_quarantine }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% else %}
+<section class="panel"><div class="body"><p class="empty">还没有批次，先导入样例。</p></div></section>
+{% endif %}
+{% endblock %}

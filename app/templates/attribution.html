@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}归因分解{% endblock %}
+{% block content %}
+{% if attribution and not attribution.empty %}
+{% set total = attribution.total %}
+<section class="panel">
+  <h2>净收入差分解<span class="meta">基期 {{ attribution.base[0] }} → {{ attribution.base[1] }} ／ 当期 {{ attribution.cur[0] }} → {{ attribution.cur[1] }}</span></h2>
+  <div class="body">
+    <div class="grid-metrics" style="margin-bottom:12px">
+      <div class="metric"><div class="k">基期净收入</div><div class="v">{{ total.rev_base|money }}<small>元</small></div></div>
+      <div class="metric"><div class="k">当期净收入</div><div class="v">{{ total.rev_cur|money }}<small>元</small></div></div>
+      <div class="metric"><div class="k">差额</div><div class="v">{{ total.delta|money }}<small>元</small></div></div>
+      <div class="metric"><div class="k">可售房晚</div><div class="v">{{ total.factors[0].value|money }}</div></div>
+      <div class="metric"><div class="k">出租率</div><div class="v">{{ total.factors[1].value|money }}</div></div>
+      <div class="metric"><div class="k">均价</div><div class="v">{{ total.factors[2].value|money }}</div></div>
+    </div>
+    <div class="bars" id="factor-bars">
+      {% for factor in total.factors %}
+      <div class="bar-row" data-value="{{ factor.value }}">
+        <span class="lb">{{ factor.label }}</span>
+        <span class="bar-track"><span class="bar-zero"></span><span class="bar-fill"></span></span>
+        <span class="vl">{{ factor.value|money }} 元</span>
+      </div>
+      {% endfor %}
+      <div class="bar-row" data-value="{{ total.residual }}">
+        <span class="lb">残差</span>
+        <span class="bar-track"><span class="bar-zero"></span><span class="bar-fill"></span></span>
+        <span class="vl">{{ total.residual|money }} 元</span>
+      </div>
+    </div>
+    <p class="hint">三因子合计 + 残差 = 差额；残差来自分位数四舍五入。
+      {% if not attribution.identity_ok %}<span class="tag confirmed">不平</span>{% endif %}</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>门店贡献<span class="meta">前 {{ attribution.rows|length }} 组 · 其他 {{ attribution.other.count }} 组</span></h2>
+  <div class="body tight scroll">
+    <table>
+      <thead><tr><th class="static">门店</th><th class="num static">基期</th><th class="num static">当期</th>
+        <th class="num static">差额</th><th class="num static">份额</th><th class="num static">可售</th>
+        <th class="num static">出租率</th><th class="num static">均价</th><th class="static">分解</th></tr></thead>
+      <tbody>
+      {% for row in attribution.rows %}
+        <tr>
+          <td class="mono">{{ row.label }}</td>
+          <td class="num">{{ row.rev_base|money }}</td>
+          <td class="num">{{ row.rev_cur|money }}</td>
+          <td class="num">{{ row.delta|money }}</td>
+          <td class="num">{{ row.share|percent if row.share else "-" }}</td>
+          {% for factor in row.decomposition.factors %}
+          <td class="num">{{ factor.value|money }}</td>
+          {% endfor %}
+          <td><span class="tag {{ 'ok' if row.ok else 'warn' }}">{{ "平" if row.ok else "残差" }}</span></td>
+        </tr>
+      {% endfor %}
+        <tr>
+          <td>其他 {{ attribution.other.count }} 组</td>
+          <td class="num">-</td><td class="num">-</td>
+          <td class="num">{{ attribution.other.delta|money }}</td>
+          <td class="num">{{ attribution.other.share|percent if attribution.other.share else "-" }}</td>
+          <td class="num">-</td><td class="num">-</td><td class="num">-</td><td>-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>窗口覆盖<span class="meta">份额合计 {{ attribution.share_sum|percent }}</span></h2>
+  <div class="body">
+    <dl class="kv">
+      <dt>基期序列</dt><dd>{{ attribution.coverage.series_base }}</dd>
+      <dt>当期序列</dt><dd>{{ attribution.coverage.series_cur }}</dd>
+      <dt>两期都有</dt><dd>{{ attribution.coverage.series_both }}</dd>
+      <dt>仅基期</dt><dd>{{ attribution.coverage.series_only_base }}</dd>
+      <dt>仅当期</dt><dd>{{ attribution.coverage.series_only_cur }}</dd>
+      <dt>基期点</dt><dd>{{ attribution.coverage.points_base }}</dd>
+      <dt>当期点</dt><dd>{{ attribution.coverage.points_cur }}</dd>
+    </dl>
+    <p class="hint">窗口规则：<a class="plain" href="/api/contract">/api/contract</a></p>
+  </div>
+</section>
+{% else %}
+<section class="panel"><div class="body"><p class="empty">还没有批次，先导入样例。</p></div></section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}异常复盘{% endblock %}
+{% block content %}
+{% if review and review.cards is defined and not review.empty %}
+{% set top = review.cards[0] %}
+<section class="grid-metrics">
+  <div class="metric"><div class="k">复盘卡</div><div class="v">{{ review.summary.cards }}</div></div>
+  <div class="metric"><div class="k">稳定</div><div class="v">{{ review.summary.stable }}</div></div>
+  <div class="metric"><div class="k">翻转</div><div class="v">{{ review.summary.unstable }}</div></div>
+  <div class="metric"><div class="k">同批</div><div class="v">{{ review.summary.groups }}<small>组</small></div></div>
+  <div class="metric"><div class="k">低置信</div><div class="v">{{ review.summary.low }}</div></div>
+  <div class="metric"><div class="k">节假日偏移</div><div class="v">{{ review.summary.holiday_cards }}</div></div>
+</section>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>敏感性矩阵<span class="meta">{{ review.summary.cards }} 张卡 · 9 组合 · {{ review.summary.axis }}</span></h2>
+    <div class="body tight scroll">
+      <table id="axis-table">
+        <thead><tr><th class="static">组合</th><th class="num static">窗口</th><th class="num static">阈值</th>
+          <th class="num static">确认点</th><th class="num static">组合事件</th><th class="num static">卡保留</th>
+          <th class="num static">卡翻转</th><th class="static">结论</th></tr></thead>
+        <tbody>
+        {% for combo in review.sensitivity.combos %}
+          <tr>
+            <td class="mono">{{ combo.key }}{% if combo.is_base %} <span class="tag plan">基准</span>{% endif %}</td>
+            <td class="num">{{ combo.window }}</td>
+            <td class="num">{{ combo.threshold }}</td>
+            <td class="num">{{ combo.confirmed_points }}</td>
+            <td class="num">{{ combo.events }}</td>
+            <td class="num">{{ combo.kept }}</td>
+            <td class="num">{{ combo.flipped }}</td>
+            <td><span class="tag {{ 'pass' if combo.flipped == 0 else 'confirmed' }}">{{ '稳定' if combo.flipped == 0 else '翻转' }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>同批异常<span class="meta">{{ review.summary.groups }} 组 · {{ review.summary.group_hotels }} 门店</span></h2>
+    <div class="body tight scroll">
+      <table>
+        <thead><tr><th class="static">组</th><th class="static">起止</th><th class="num static">天数</th>
+          <th class="static">方向</th><th class="static">门店</th><th class="static">范围</th></tr></thead>
+        <tbody>
+        {% for group in review.groups %}
+          <tr>
+            <td class="mono truncate" title="{{ group.group_id }}">{{ group.group_id }}</td>
+            <td class="mono">{{ group.start }} → {{ group.end }}</td>
+            <td class="num">{{ group.days }}</td>
+            <td>{{ group.direction|direction }}</td>
+            <td class="mono">{{ group.hotels|join(' ') }}</td>
+            <td><span class="tag plan">{{ group.scope|scope }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if not review.groups %}<p class="empty">没有同批异常。</p>{% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>复盘卡<span class="meta">{{ review.summary.cards }} 张 · 中 {{ review.summary.medium }} 低 {{ review.summary.low }}</span></h2>
+  <div class="body tight scroll">
+    <table id="card-table">
+      <thead><tr><th class="static">卡号</th><th class="static">序列</th><th class="static">区间</th>
+        <th class="num static">天数</th><th class="static">方向</th><th class="num static">差额</th>
+        <th class="static">主因子</th><th class="num static">复核 z</th><th class="static">置信</th>
+        <th class="static">结论</th><th class="static">标记码</th></tr></thead>
+      <tbody>
+      {% for item in review.cards %}
+        <tr>
+          <td class="mono truncate" title="{{ item.event_id }}">{{ item.event_id }}</td>
+          <td class="mono">{{ item.series }}</td>
+          <td class="mono">{{ item.start }} → {{ item.end }}</td>
+          <td class="num">{{ item.days }}</td>
+          <td>{{ item.direction|direction }}</td>
+          <td class="num">{{ item.delta|money }}</td>
+          <td>{{ item.factors.dominant|factor }}{% if not item.factors.ok %} <span class="tag candidate">{{ item.factors.code }}</span>{% endif %}</td>
+          <td class="num">{{ item.baseline.z or "-" }}</td>
+          <td><span class="tag {{ 'normal' if item.confidence == 'high' else ('candidate' if item.confidence == 'medium' else 'confirmed') }}">{{ item.confidence|confidence }}</span></td>
+          <td><span class="tag {{ 'pass' if item.verdict == 'stable' else 'confirmed' }}">{{ item.verdict|verdict }}</span></td>
+          <td class="mono truncate" title="{{ item.flags|map(attribute='code')|join(' ') }}">{{ item.flags|map(attribute='code')|join(' ') or "-" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if top %}
+<div class="grid-2">
+  <section class="panel">
+    <h2>逐日证据<span class="meta">{{ top.event_id }}</span></h2>
+    <div class="body tight scroll">
+      <table>
+        <thead><tr><th class="static">业务日</th><th class="num static">净收入</th><th class="num static">基线中位数</th>
+          <th class="num static">离散度</th><th class="static">方式</th><th class="num static">z</th><th class="static">状态</th></tr></thead>
+        <tbody>
+        {% for row in top.evidence %}
+          <tr>
+            <td class="mono">{{ row.biz_date }}</td>
+            <td class="num">{{ row.value|money }}</td>
+            <td class="num">{{ row.median|money }}</td>
+            <td class="num">{{ row.dispersion }}</td>
+            <td>{{ row.method }}</td>
+            <td class="num">{{ row.z or "-" }}</td>
+            <td><span class="tag {{ row.status }}">{{ row.status|status }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>动作与标记<span class="meta">{{ top.confidence|confidence }} · {{ top.verdict|verdict }}</span></h2>
+    <div class="body">
+      <dl class="kv">
+        <dt>基线点数</dt><dd>{{ top.baseline.points }} / 用 {{ top.baseline.used_points }}</dd>
+        <dt>节假日在基线</dt><dd>{{ top.baseline.holiday_points }} 点 · {{ top.baseline.holiday_share|percent }}</dd>
+        <dt>基线中位数</dt><dd>{{ top.baseline.median|money }}</dd>
+        <dt>离散度</dt><dd>{{ top.baseline.dispersion }} · {{ top.baseline.method }}</dd>
+        <dt>复核 z</dt><dd>{{ top.baseline.z or "-" }}</dd>
+        <dt>分解残差</dt><dd>{{ top.factors.residual|money }}</dd>
+        <dt>翻转组合</dt><dd class="truncate" title="{{ top.flipped|join(' ') }}">{{ top.flipped|join(' ') or "-" }}</dd>
+      </dl>
+      <ul class="hint">
+        {% for action in top.actions %}<li>{{ action.label }} <span class="mono">{{ action.code }}</span></li>{% endfor %}
+        {% for flag in top.flags %}<li>{{ flag.code }} · {{ flag.detail }}</li>{% endfor %}
+      </ul>
+      {% if not top.actions and not top.flags %}<p class="empty">这张卡没有待办。</p>{% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>同向对照<span class="meta">{{ top.event_id }} · {{ top.peers|length }} 条</span></h2>
+  <div class="body tight scroll">
+    <table>
+      <thead><tr><th class="static">序列</th><th class="static">门店</th><th class="static">渠道</th>
+        <th class="static">关系</th><th class="num static">重叠天</th></tr></thead>
+      <tbody>
+      {% for peer in top.peers %}
+        <tr>
+          <td class="mono">{{ peer.series }}</td>
+          <td class="mono">{{ peer.hotel_code }}</td>
+          <td>{{ peer.channel|channel }}</td>
+          <td>{{ peer.relation|relation }}</td>
+          <td class="num">{{ peer.days }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if not top.peers %}<p class="empty">没有同向对照。</p>{% endif %}
+  </div>
+</section>
+{% endif %}
+{% else %}
+<section class="panel"><div class="body"><p class="empty">还没有批次，先导入样例。</p></div></section>
+{% endif %}
+{% endblock %}

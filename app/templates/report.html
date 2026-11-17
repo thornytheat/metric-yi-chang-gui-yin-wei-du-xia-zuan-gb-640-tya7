@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}运行报告{% endblock %}
+{% block content %}
+{% if report and report.run %}
+<section class="panel">
+  <h2>运行清单<span class="meta">{{ report.run.run_id }}</span></h2>
+  <div class="body">
+    <dl class="kv">
+      <dt>输入文件</dt><dd>{{ report.run.input_name }}</dd>
+      <dt>字节数</dt><dd>{{ report.run.input_bytes }}</dd>
+      <dt>sha256</dt><dd class="truncate" title="{{ report.run.input_sha256 }}">{{ report.run.input_sha256 }}</dd>
+      <dt>规则版本</dt><dd>{{ report.run.rules_version }}</dd>
+      <dt>生成时间</dt><dd>{{ report.run.created_at }}</dd>
+      <dt>编码</dt><dd>{{ report.run.encoding }}</dd>
+      <dt>水位</dt><dd>{{ report.run.watermark }}</dd>
+      <dt>耗时</dt><dd>{{ report.run.duration_ms }} ms</dd>
+    </dl>
+  </div>
+</section>
+
+<section class="grid-3">
+  <section class="panel">
+    <h2>四账<span class="meta">行 / 点 / 金额</span></h2>
+    <div class="body tight">
+      <table>
+        <tbody>
+          <tr><td>读入行</td><td class="num">{{ report.accounts.rows_read|int }}</td></tr>
+          <tr><td>有效点</td><td class="num">{{ report.accounts.points_valid|int }}</td></tr>
+          <tr><td>缺失点</td><td class="num">{{ report.accounts.points_missing|int }}</td></tr>
+          <tr><td>被覆盖</td><td class="num">{{ report.accounts.rows_superseded|int }}</td></tr>
+          <tr><td>隔离行</td><td class="num">{{ report.accounts.rows_quarantine|int }}</td></tr>
+          <tr><td>净收入合计</td><td class="num">{{ report.accounts.revenue_accepted|money }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>异常<span class="meta">{{ report.detection.events|default(0) }} 次事件</span></h2>
+    <div class="body tight">
+      <table>
+        <tbody>
+          <tr><td>序列</td><td class="num">{{ report.detection.series|default(0) }}</td></tr>
+          <tr><td>确认点</td><td class="num">{{ report.detection.confirmed_points|default(0) }}</td></tr>
+          <tr><td>候选点</td><td class="num">{{ report.detection.candidate_points|default(0) }}</td></tr>
+          <tr><td>基线不足</td><td class="num">{{ report.detection.insufficient_points|default(0) }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>分解<span class="meta">{{ report.attribution.cur[0] }} → {{ report.attribution.cur[1] }}</span></h2>
+    <div class="body tight">
+      <table>
+        <tbody>
+        {% for factor in report.attribution.total.factors %}
+          <tr><td>{{ factor.label }}</td><td class="num">{{ factor.value|money }}</td></tr>
+        {% endfor %}
+          <tr><td>残差</td><td class="num">{{ report.attribution.total.residual|money }}</td></tr>
+          <tr><td>差额</td><td class="num">{{ report.attribution.total.delta|money }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+
+<section class="panel">
+  <h2>异常事件<span class="meta">前 {{ report.events|length }} 条</span></h2>
+  <div class="body tight">
+    <table>
+      <thead><tr><th class="static">序列</th><th class="static">起</th><th class="static">止</th>
+        <th class="num static">天数</th><th class="static">方向</th><th class="num static">差额</th></tr></thead>
+      <tbody>
+      {% for item in report.events %}
+        <tr><td class="mono">{{ item.series }}</td><td class="mono">{{ item.start }}</td><td class="mono">{{ item.end }}</td>
+          <td class="num">{{ item.days }}</td><td>{{ item.direction|direction }}</td>
+          <td class="num">{{ item.delta|money }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="grid-2">
+  <section class="panel">
+    <h2>原因码<span class="meta">{{ report.reason_counts|length }} 类</span></h2>
+    <div class="body tight">
+      <table>
+        <thead><tr><th class="static">码</th><th class="static">含义</th><th class="num static">条</th></tr></thead>
+        <tbody>
+        {% for row in report.reason_counts %}
+          <tr><td class="mono">{{ row.code }}</td><td>{{ row.label }}</td><td class="num">{{ row.count }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>导出<span class="meta">4 个文件</span></h2>
+    <div class="body">
+      <ul class="hint">
+        <li><a class="plain" href="/api/export/points.csv">points.csv</a></li>
+        <li><a class="plain" href="/api/export/anomalies.csv">anomalies.csv</a></li>
+        <li><a class="plain" href="/api/export/attribution.csv">attribution.csv</a></li>
+        <li><a class="plain" href="/api/export/manifest.json">manifest.json</a></li>
+        <li><a class="plain" href="/api/quarantine.csv">quarantine.csv</a></li>
+      </ul>
+      <dl class="kv">
+        <dt>字段含义</dt><dd><a class="plain" href="/api/contract">/api/contract</a></dd>
+        <dt>窗口覆盖</dt><dd>{{ report.attribution.coverage.points_cur }} 点</dd>
+      </dl>
+    </div>
+  </section>
+</div>
+{% else %}
+<section class="panel"><div class="body"><p class="empty">还没有批次，先导入样例。</p></div></section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,30 @@
+/* theme.css —— 只有设计令牌：L10 水位时间轴，深青 185°，深色，中密度，直角。 */
+:root {
+  --bg: #05161a;
+  --bg-deep: #030f12;
+  --surface: #0a2126;
+  --surface-2: #0e2b30;
+  --surface-3: #123238;
+  --ink: #dcecec;
+  --ink-muted: #90b1b4;
+  --ink-faint: #5d7f83;
+  --line: #1b3d43;
+  --line-strong: #2b5c63;
+  --accent: #14a8a4;
+  --accent-ink: #04170f;
+  --accent-soft: #0d3b3c;
+  --ok: #46c08a;
+  --warn: #e0a63a;
+  --bad: #e4645c;
+  --info: #58a6c8;
+  --font-ui: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", system-ui, sans-serif;
+  --font-num: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+  --font-doc: "Songti SC", "SimSun", serif;
+  --radius: 2px;
+  --radius-sm: 1px;
+  --pad: 14px;
+  --gap: 10px;
+  --rail-h: 78px;
+  --shadow: none;
+  --tick-w: 6px;
+}

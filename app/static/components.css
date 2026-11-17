@@ -1,0 +1,207 @@
+/* components.css —— 刻度、水位线、明细表、状态、表单、打印。 */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.panel > h2 {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.panel > h2 .meta {
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+.panel .body { padding: 12px; }
+.panel .body.tight { padding: 0; }
+
+/* 运行刻度条：横轴是业务日期，竖线是水位线 */
+.axis { position: relative; height: var(--rail-h); min-width: 620px; }
+.axis .scale {
+  position: absolute;
+  left: 0; right: 0; bottom: 20px;
+  height: 1px;
+  background: var(--line-strong);
+}
+.axis .tick {
+  position: absolute;
+  bottom: 14px;
+  width: var(--tick-w);
+  margin-left: -3px;
+  background: var(--line-strong);
+  border: none;
+  padding: 0;
+  cursor: default;
+}
+.axis .tick.ok { background: var(--accent); }
+.axis .tick.warn { background: var(--warn); }
+.axis .tick.bad { background: var(--bad); }
+.axis .tick span {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-num);
+  font-size: 10px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  margin-bottom: 3px;
+}
+.axis .tick.end span { left: auto; right: 0; transform: none; }
+.axis .watermark {
+  position: absolute;
+  top: 2px; bottom: 14px;
+  width: 1px;
+  background: var(--warn);
+}
+.axis .watermark::after {
+  content: "水位";
+  position: absolute;
+  top: -2px; left: 5px;
+  font-size: 10px;
+  color: var(--warn);
+  white-space: nowrap;
+}
+.axis .watermark.end::after { left: auto; right: 6px; }
+.axis .daymark {
+  position: absolute;
+  bottom: 22px;
+  width: 5px; height: 12px;
+  margin-left: -2px;
+  background: var(--bad);
+}
+.axis .daymark.candidate { background: var(--warn); }
+.axis .caption {
+  position: absolute;
+  left: 0; bottom: 0;
+  font-family: var(--font-num);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+.axis .tick-label { bottom: 36px; transform: translateX(-50%); }
+.axis .tick-label.edge-start { transform: none; }
+.axis .tick-label.edge-end { transform: translateX(-100%); }
+
+/* 指标条 */
+.metric {
+  background: var(--surface);
+  padding: 9px 11px;
+}
+.metric .k { font-size: 11px; color: var(--ink-muted); }
+.metric .v {
+  font-family: var(--font-num);
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.metric .v small { font-size: 11px; color: var(--ink-faint); margin-left: 3px; }
+
+/* 明细表 */
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  font-weight: 500;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+th.static { cursor: default; }
+tbody tr:hover { background: var(--surface-2); }
+td.num, th.num { text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+td.mono { font-family: var(--font-num); }
+td.truncate { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scroll { max-height: 460px; overflow: auto; }
+
+/* 状态标签：方框，无圆角 */
+.tag {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+.tag.confirmed, .tag.ok { border-color: var(--bad); color: var(--bad); }
+.tag.candidate, .tag.warn { border-color: var(--warn); color: var(--warn); }
+.tag.normal, .tag.pass { border-color: var(--ok); color: var(--ok); }
+.tag.insufficient, .tag.undefined { border-color: var(--ink-faint); color: var(--ink-faint); }
+.tag.plan { border-color: var(--info); color: var(--info); }
+
+/* 分解条 */
+.bars { display: grid; gap: 6px; }
+.bar-row { display: grid; grid-template-columns: 86px 1fr 118px; align-items: center; gap: 8px; }
+.bar-row .lb { font-size: 12px; color: var(--ink-muted); }
+.bar-track { position: relative; height: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+.bar-fill { position: absolute; left: 50%; top: 0; bottom: 0; background: var(--accent); }
+.bar-fill.neg { background: var(--bad); }
+.bar-fill.pos { background: var(--ok); }
+.bar-zero { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--line-strong); }
+.bar-row .vl { font-family: var(--font-num); font-size: 12px; text-align: right; }
+
+/* 表单 */
+form.import { display: grid; grid-template-columns: 1fr 240px 190px; gap: 8px; align-items: end; }
+label { display: grid; gap: 3px; font-size: 11.5px; color: var(--ink-muted); }
+select, input[type="text"], input[type="file"], input[type="number"] {
+  background: var(--bg-deep);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  padding: 5px 7px;
+}
+select:focus, input:focus, button:focus-visible, a:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+button {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  padding: 5px 13px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+button:hover { background: var(--accent-soft); }
+button.primary { background: var(--accent); color: var(--accent-ink); }
+button.ghost { border-color: var(--line-strong); color: var(--ink-muted); }
+button.small { padding: 2px 8px; font-size: 11.5px; }
+
+.msg { font-size: 12px; color: var(--warn); min-height: 18px; }
+.msg.err { color: var(--bad); }
+.hint { font-size: 11.5px; color: var(--ink-faint); }
+.empty {
+  padding: 18px 12px;
+  color: var(--ink-faint);
+  font-size: 12.5px;
+}
+.kv { display: grid; grid-template-columns: 132px 1fr; gap: 2px 10px; font-size: 12.3px; }
+.kv dt { color: var(--ink-muted); }
+.kv dd { margin: 0; font-family: var(--font-num); }
+a { color: var(--info); }
+a.plain { color: var(--ink-muted); text-decoration: none; border-bottom: 1px dotted var(--line-strong); }
+
+@media print {
+  body { background: #fff; color: #111; }
+  .topbar, .rail, button, form.import { display: none; }
+  .panel { border-color: #bbb; }
+  main { padding: 0; }
+}
